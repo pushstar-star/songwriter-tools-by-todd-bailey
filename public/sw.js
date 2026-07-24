@@ -1,4 +1,4 @@
-const CACHE_NAME = "stage-chords-offline-v2";
+const CACHE_NAME = "stage-chords-offline-v3";
 const APP_SHELL = ["/", "/songs.json", "/manifest.webmanifest", "/og.png"];
 
 self.addEventListener("install", (event) => {
