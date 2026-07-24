@@ -65,6 +65,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .status-dot.saved { background: #62c98a; box-shadow: 0 0 10px #62c98a; }
 
 .player { min-height: 100vh; padding-bottom: 290px; }
+.player.controls-hidden { padding-bottom: 72px; }
 .player-nav {
   position: sticky; top: 0; z-index: 20; height: calc(66px + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) 15px 0; display: grid; grid-template-columns: 48px 1fr 48px;
@@ -130,6 +131,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .sliders .large-a { font-size: 13px; }
 .dock-footer { width: min(100%, 680px); margin: 11px auto 0; display: flex; justify-content: space-between; align-items: center; color: #7c7972; font: 700 9px/1 Arial; letter-spacing: .04em; }
 .dock-footer button { background: transparent; border: 0; color: inherit; padding: 4px 0; display: flex; gap: 7px; align-items: center; cursor: pointer; }
+.dock-footer .hide-controls { color: #d7d2c8; text-transform: uppercase; letter-spacing: .08em; }
+.dock-footer .hide-controls span { color: var(--orange); font-size: 14px; }
 .toggle { width: 25px; height: 14px; border-radius: 20px; background: #383838; padding: 2px; transition: .2s; }
 .toggle i { display: block; width: 10px; height: 10px; border-radius: 50%; background: #aaa; transition: .2s; }
 .toggle.on { background: var(--orange); }
@@ -137,6 +140,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .awake { display: flex; align-items: center; gap: 6px; }
 .awake i { width: 5px; height: 5px; border-radius: 50%; background: #555; }
 .awake.active i { background: #62c98a; box-shadow: 0 0 7px #62c98a; }
+.show-controls {
+  position: fixed; z-index: 30; left: 50%; bottom: max(8px, env(safe-area-inset-bottom));
+  transform: translateX(-50%); border: 1px solid #383838; border-radius: 999px;
+  background: rgba(20,20,20,.92); backdrop-filter: blur(16px); color: #d7d2c8;
+  padding: 8px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  font: 800 9px/1 Arial; letter-spacing: .1em; text-transform: uppercase;
+  white-space: nowrap; cursor: pointer;
+}
+.show-controls span { color: var(--orange); font-size: 13px; margin-right: 5px; }
 
 @media (min-width: 700px) {
   .library { padding-inline: 30px; }

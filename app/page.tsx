@@ -27,6 +27,7 @@ export default function Home() {
   const [speed, setSpeed] = useState(28);
   const [fontSize, setFontSize] = useState(18);
   const [showChords, setShowChords] = useState(true);
+  const [controlsHidden, setControlsHidden] = useState(false);
   const [wakeActive, setWakeActive] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
@@ -72,9 +73,14 @@ export default function Home() {
 
   const stop = useCallback(() => {
     setPlaying(false);
+    setControlsHidden(false);
     previousTime.current = null;
     if (frame.current) cancelAnimationFrame(frame.current);
   }, []);
+
+  useEffect(() => {
+    if (!playing) setControlsHidden(false);
+  }, [playing]);
 
   useEffect(() => {
     if (!playing) return;
@@ -170,7 +176,7 @@ export default function Home() {
   }
 
   return (
-    <main className="player" style={{ "--song-font": `${fontSize}px` } as React.CSSProperties}>
+    <main className={`player ${controlsHidden ? "controls-hidden" : ""}`} style={{ "--song-font": `${fontSize}px` } as React.CSSProperties}>
       <nav className="player-nav">
         <button onClick={() => { stop(); setCurrentId(null); }} aria-label="Back to set list">←</button>
         <div>
@@ -211,7 +217,7 @@ export default function Home() {
         </div>
       </article>
 
-      <section className="control-dock" aria-label="Performance controls">
+      {!controlsHidden ? <section className="control-dock" aria-label="Performance controls">
         <div className="control-row">
           <button className="side-button" onClick={() => goToSong(-1)} aria-label="Previous song">‹</button>
           <button className={`main-button ${playing ? "is-playing" : ""}`} onClick={() => setPlaying((value) => !value)}>
@@ -239,9 +245,18 @@ export default function Home() {
             <span className={showChords ? "toggle on" : "toggle"}><i /></span>
             Chords
           </button>
+          {playing ? (
+            <button className="hide-controls" onClick={() => setControlsHidden(true)}>
+              <span aria-hidden="true">⌄</span> Hide controls
+            </button>
+          ) : null}
           <span className={wakeActive ? "awake active" : "awake"}><i /> {wakeActive ? "Screen awake" : "Screen wakes when playing"}</span>
         </div>
-      </section>
+      </section> : (
+        <button className="show-controls" onClick={() => setControlsHidden(false)}>
+          <span aria-hidden="true">⌃</span> Show controls
+        </button>
+      )}
     </main>
   );
 }
