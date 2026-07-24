@@ -62,6 +62,7 @@ button { -webkit-tap-highlight-color: transparent; }
   padding-top: 28px; font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
 }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); }
+.status-dot.saved { background: #62c98a; box-shadow: 0 0 10px #62c98a; }
 
 .player { min-height: 100vh; padding-bottom: 290px; }
 .player-nav {

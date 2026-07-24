@@ -28,18 +28,40 @@ export default function Home() {
   const [fontSize, setFontSize] = useState(18);
   const [showChords, setShowChords] = useState(true);
   const [wakeActive, setWakeActive] = useState(false);
+  const [offlineReady, setOfflineReady] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const wakeLock = useRef<{ release: () => Promise<void> } | null>(null);
   const frame = useRef<number | null>(null);
   const previousTime = useRef<number | null>(null);
 
   useEffect(() => {
+    setIsOnline(navigator.onLine);
     fetch("/songs.json")
       .then((response) => response.json())
-      .then(setSongs);
+      .then(setSongs)
+      .catch(() => undefined);
     const savedSpeed = Number(localStorage.getItem("stage-scroll-speed"));
     const savedFont = Number(localStorage.getItem("stage-font-size"));
     if (savedSpeed) setSpeed(savedSpeed);
     if (savedFont) setFontSize(savedFont);
+
+    const online = () => setIsOnline(true);
+    const offline = () => setIsOnline(false);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => setOfflineReady(true))
+        .catch(() => setOfflineReady(false));
+    }
+
+    return () => {
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
   }, []);
 
   useEffect(() => localStorage.setItem("stage-scroll-speed", String(speed)), [speed]);
@@ -140,7 +162,8 @@ export default function Home() {
           ))}
         </section>
         <footer className="library-footer">
-          <span className="status-dot" /> Ready for the stage
+          <span className={`status-dot ${offlineReady ? "saved" : ""}`} />
+          {!isOnline ? "Working offline" : offlineReady ? "Saved for offline use" : "Saving for offline use…"}
         </footer>
       </main>
     );

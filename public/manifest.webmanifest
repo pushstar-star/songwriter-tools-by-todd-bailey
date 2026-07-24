@@ -1,0 +1,11 @@
+{
+  "name": "Stage Chords",
+  "short_name": "Stage Chords",
+  "description": "An offline, auto-scrolling chord and lyric book for live performance.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090909",
+  "theme_color": "#090909",
+  "orientation": "portrait-primary",
+  "categories": ["music", "utilities"]
+}
