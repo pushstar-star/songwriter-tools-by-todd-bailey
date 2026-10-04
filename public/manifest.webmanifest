@@ -1,11 +1,11 @@
 {
-  "name": "Stage Chords",
-  "short_name": "Stage Chords",
-  "description": "An offline, auto-scrolling chord and lyric book for live performance.",
+  "name": "Songwriter Tools by Todd Bailey",
+  "short_name": "Songwriter Tools",
+  "description": "Write, organize, improve, pitch, and perform your songs.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#090909",
-  "theme_color": "#090909",
+  "background_color": "#171814",
+  "theme_color": "#171814",
   "orientation": "portrait-primary",
   "categories": ["music", "utilities"]
 }

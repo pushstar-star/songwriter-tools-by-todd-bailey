@@ -1,98 +1,50 @@
-# vinext-starter
+# Songwriter Tools by Todd Bailey
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+A responsive songwriting workspace combining song drafting, chord charts, live performance, setlists, TunePitch preparation, and personal critique orders.
 
-## Prerequisites
+## Run locally
 
-- Node.js `>=22.13.0`
-
-## Quick Start
+Requires Node.js 22.13 or newer.
 
 ```bash
 npm install
 npm run dev
-npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+Open the local URL printed by the server. Microphone access works on `localhost` or HTTPS. Run `npm test` for music-theory and pitch tests and `npm run build` for a production build.
 
-## Included Shape
+## Deployment
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+The existing starter uses vinext. Use `npm run build` and `npm start`. Before publishing to GoDaddy Node.js Apps, confirm the plan supports Node 22 and a persistent process. Set the application root to this directory and the start command to `npm start`. If that plan supports standard Next.js but not vinext, migrate the scripts to `next build` / `next start` first.
 
-## Workspace Auth Headers
+Copy `.env.example` to `.env.local` for local configuration. Never commit `.env.local`.
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+## Important first-version status
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+The preview identifies itself as a **local demo workspace**. Songs, setlists, and draft orders persist in browser local storage; no payment, delivery, critique, or AI result is fabricated. AI, checkout, and delivery show setup/sandbox states when credentials are absent.
 
-Treat the full name as optional and fall back to email when it is absent:
+Before accepting real customer data, production still requires:
 
-```tsx
-import { headers } from "next/headers";
+- database-backed accounts and server-side owner/admin authorization;
+- private object storage, signed downloads, and server-side upload validation;
+- a server-only AI route using `OPENAI_API_KEY`;
+- a payment provider and verified, idempotent webhooks;
+- a TunePitch provider adapter and auditable delivery events;
+- user-scoped encrypted offline storage and cache clearing on logout.
 
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
+Do not use this browser demo for confidential songs or payments. The UI/workflows are ready for backend integration, but setup labels must remain until those systems are operational.
 
-  const displayName = fullName ?? email;
-  // ...
-}
-```
+## Implemented workflows
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+- Song catalog, metadata, structured lyric sections, reorder/duplicate, notes, credits, tags, versions, autosave indicator, JSON export, and print.
+- Songwriter Profile with required account name/email, validated profile photo, bio, location, website and social/music links, opt-in public visibility, and an explicitly selected in-app song showcase. Email and private song workspace data never appear in the public preview.
+- Writing helper interface for all requested actions; it refuses to fake AI output without a provider.
+- ChordPro charts, token-safe transposition, original preservation, print/PDF, responsive live mode, auto-scroll, text sizing, and PWA shell caching.
+- Six-string chord identifier with muted/open strings, frets 0–12, slash chords, capo, Standard/Drop D/DADGAD/custom tunings, alternatives, and print.
+- Local Web Audio tuner with permission/error/weak-signal states, calibration, target strings, autocorrelation, and microphone release.
+- Setlist ordering, covers, per-performance overrides, breaks, and total duration.
+- TunePitch and critique preparation, review, draft history, sandbox disclosure, and admin status/configuration UI.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## Privacy and offline behavior
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+The service worker caches only the public application shell. It does not cache sample-song JSON. Production must never put private song APIs/files in a shared cache and must clear all user-specific offline stores at logout.

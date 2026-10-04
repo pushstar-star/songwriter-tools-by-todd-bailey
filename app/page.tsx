@@ -1,262 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { autoCorrelate, frequencyToNote, identifyChord, NOTE_NAMES, transposeChordPro, TUNINGS } from "./music";
 
-type Song = {
-  id: string;
-  title: string;
-  artist: string;
-  meta: string;
-  content: string;
-};
+type View = "Dashboard"|"My Songs"|"Writing Tools"|"Chord Charts"|"Setlists"|"TunePitch"|"Song Critiques"|"Account"|"Admin";
+type Section = { id:string; type:string; text:string };
+type Song = { id:string; title:string; genre:string; mood:string; key:string; tempo:number; capo:number; status:string; sections:Section[]; notes:string; tags:string; credits:string; archived?:boolean; versions:{date:string;sections:Section[]}[] };
+type SetSong = { id:string; songId:string; title:string; key:string; capo:number; duration:number; notes:string; cover:boolean };
+type Setlist = { id:string; name:string; venue:string; date:string; breakMinutes:number; songs:SetSong[] };
+type Order = { id:string; kind:"TunePitch"|"Critique"; song:string; status:string; created:string; update:string };
+type Profile = { name:string; email:string; photo:string; bio:string; location:string; website:string; instagram:string; facebook:string; youtube:string; spotify:string; publicProfile:boolean; sharedSongIds:string[] };
+const uid=()=>Math.random().toString(36).slice(2,10);
+const seedSong: Song = { id:"demo-midnight",title:"Midnight Highway",genre:"Americana",mood:"Hopeful",key:"G",tempo:92,capo:2,status:"Revising",notes:"Build the final chorus dynamically.",tags:"road, home",credits:"Todd Bailey — 100%",versions:[],sections:[{id:"s1",type:"Verse",text:"[G]Headlights draw a line across the [C]rain\n[G]Your name on the dashboard, fading [D]again"},{id:"s2",type:"Chorus",text:"[C]I’m coming home on this midnight [G]highway\n[Em]Holding the wheel like a [D]promise I made"}]};
+const nav: View[]=["Dashboard","My Songs","Writing Tools","Chord Charts","Setlists","TunePitch","Song Critiques","Account"];
+const tools=["Rhyme finder","Title & hook ideas","Alternate line","Match syllable count","Stronger imagery","Cliché check","Develop verse or chorus","Story clarity"];
 
-const chordLine = /^[\s|()xX0-9A-G#bmsujdi/\-.+]+$/;
+function useStored<T>(key:string, initial:T) { const [value,setValue]=useState<T>(initial); const ready=useRef(false); useEffect(()=>{try{const raw=localStorage.getItem(key);if(raw)setValue(JSON.parse(raw))}catch{}ready.current=true},[key]); useEffect(()=>{if(ready.current)localStorage.setItem(key,JSON.stringify(value))},[key,value]); return [value,setValue] as const }
 
-function PlayIcon({ playing }: { playing: boolean }) {
-  return playing ? (
-    <span className="pause-icon" aria-hidden="true"><i /><i /></span>
-  ) : (
-    <span className="play-icon" aria-hidden="true" />
-  );
+export default function Home(){
+ const [view,setView]=useState<View>("Dashboard"),[menu,setMenu]=useState(false);
+ const [songs,setSongs]=useStored<Song[]>("swt-songs",[seedSong]);
+ const [setlists,setSetlists]=useStored<Setlist[]>("swt-setlists",[{id:"set1",name:"Friday Acoustic",venue:"The Listening Room",date:"2026-10-09",breakMinutes:10,songs:[{id:"ss1",songId:seedSong.id,title:seedSong.title,key:"G",capo:2,duration:240,notes:"Count in quietly",cover:false}]}]);
+ const [orders,setOrders]=useStored<Order[]>("swt-orders",[]); const [activeSong,setActiveSong]=useState(seedSong.id),[saveState,setSaveState]=useState("Saved"); const active=songs.find(s=>s.id===activeSong)??songs[0];
+ const [profile,setProfile]=useStored<Profile>("swt-profile",{name:"Todd Bailey",email:"",photo:"",bio:"",location:"",website:"",instagram:"",facebook:"",youtube:"",spotify:"",publicProfile:false,sharedSongIds:[]});
+ const updateSong=(patch:Partial<Song>)=>{setSaveState("Saving…");setSongs(old=>old.map(s=>s.id===active?.id?{...s,...patch}:s));window.setTimeout(()=>setSaveState("Saved"),450)};
+ const createSong=()=>{const s:Song={id:uid(),title:"Untitled song",genre:"",mood:"",key:"C",tempo:100,capo:0,status:"Idea",notes:"",tags:"",credits:"",versions:[],sections:[{id:uid(),type:"Verse",text:""},{id:uid(),type:"Chorus",text:""}]};setSongs(v=>[s,...v]);setActiveSong(s.id);setView("My Songs")}; const go=(v:View)=>{setView(v);setMenu(false)};
+ return <div className="app-shell"><aside className={menu?"sidebar open":"sidebar"}><div className="brand"><span>TB</span><div><strong>Songwriter Tools</strong><small>by Todd Bailey</small></div></div><nav>{nav.map(n=><button key={n} className={view===n?"active":""} onClick={()=>go(n)}><i>{({Dashboard:"⌂","My Songs":"♫","Writing Tools":"✦","Chord Charts":"♯",Setlists:"☷",TunePitch:"↗","Song Critiques":"◉",Account:"○"} as Record<string,string>)[n]}</i>{n}</button>)}</nav><div className="side-bottom"><button onClick={()=>go("Admin")}>⚙ Admin</button><div className="user"><span>TB</span><div><b>Todd Bailey</b><small>Demo workspace</small></div></div></div></aside><main><header className="topbar"><button className="mobile-menu" onClick={()=>setMenu(!menu)}>☰</button><div><p>SONGWRITER TOOLS</p><h1>{view}</h1></div><div className="top-actions"><span className="sync">● Local demo saved</span><button className="secondary" onClick={createSong}>＋ Capture idea</button><button className="primary" onClick={createSong}>＋ New song</button></div></header><div className="page">
+ {view==="Dashboard"&&<Dashboard songs={songs} setlists={setlists} orders={orders} openSong={(id)=>{setActiveSong(id);go("My Songs")}} createSong={createSong}/>} {view==="My Songs"&&<Songs songs={songs} active={active} setActive={setActiveSong} update={updateSong} saveState={saveState} setSongs={setSongs}/>} {view==="Writing Tools"&&<WritingTools song={active} update={updateSong}/>} {view==="Chord Charts"&&<ChordCharts song={active} go={go}/>} {view==="Setlists"&&<Setlists songs={songs} lists={setlists} setLists={setSetlists}/>} {view==="TunePitch"&&<Service kind="TunePitch" songs={songs} orders={orders} setOrders={setOrders}/>} {view==="Song Critiques"&&<Service kind="Critique" songs={songs} orders={orders} setOrders={setOrders}/>} {view==="Account"&&<Account profile={profile} setProfile={setProfile} songs={songs}/>} {view==="Admin"&&<Admin orders={orders} setOrders={setOrders}/>} </div></main></div>
 }
 
-export default function Home() {
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(28);
-  const [fontSize, setFontSize] = useState(18);
-  const [showChords, setShowChords] = useState(true);
-  const [controlsHidden, setControlsHidden] = useState(false);
-  const [wakeActive, setWakeActive] = useState(false);
-  const [offlineReady, setOfflineReady] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
-  const wakeLock = useRef<{ release: () => Promise<void> } | null>(null);
-  const frame = useRef<number | null>(null);
-  const previousTime = useRef<number | null>(null);
+function Dashboard({songs,setlists,orders,openSong,createSong}:{songs:Song[];setlists:Setlist[];orders:Order[];openSong:(id:string)=>void;createSong:()=>void}){return <><section className="hero"><div><span className="eyebrow">YOUR SONGS, ONE PLACE</span><h2>Write it. Shape it.<br/><em>Share it.</em></h2><p>From the first spark to the final stage—everything your song needs, in one focused workspace.</p><button className="primary" onClick={createSong}>＋ Start a new song</button></div><div className="hero-art" aria-hidden="true"><span>♪</span><i/><i/><i/></div></section><div className="stat-grid"><article><i>♫</i><div><strong>{songs.length}</strong><span>SONGS IN YOUR CATALOG</span></div></article><article><i>✎</i><div><strong>{songs.filter(s=>s.status!=="Complete").length}</strong><span>WORKS IN PROGRESS</span></div></article><article><i>↗</i><div><strong>{orders.filter(o=>o.kind==="TunePitch").length}</strong><span>TUNEPITCH SUBMISSIONS</span></div></article><article><i>◉</i><div><strong>{orders.filter(o=>o.kind==="Critique").length}</strong><span>CRITIQUE UPDATES</span></div></article></div><div className="dash-grid"><section className="panel"><PanelHead title="Recent songs" action="View all"/><div className="song-rows">{songs.slice(0,4).map(s=><button key={s.id} onClick={()=>openSong(s.id)}><span className="album">♪</span><span><b>{s.title}</b><small>{s.genre||"Uncategorized"} · {s.status}</small></span><em>{s.key}</em><i>→</i></button>)}</div></section><section className="panel"><PanelHead title="Coming up" action="Setlists"/>{setlists.map(l=>{const [,m,d]=l.date.split("-");const month=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][Number(m)-1];return <div className="set-card" key={l.id}><span className="date"><b>{Number(d)}</b><small>{month}</small></span><div><b>{l.name}</b><small>{l.venue} · {l.songs.length} songs</small></div></div>})}<div className="quote">“Songs are snapshots of your soul at a moment in time.”<small>— TODD BAILEY</small></div></section></div></>}
+const PanelHead=({title,action}:{title:string;action:string})=><header className="panel-head"><h3>{title}</h3><button>{action} →</button></header>;
 
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
-    fetch("/songs.json")
-      .then((response) => response.json())
-      .then(setSongs)
-      .catch(() => undefined);
-    const savedSpeed = Number(localStorage.getItem("stage-scroll-speed"));
-    const savedFont = Number(localStorage.getItem("stage-font-size"));
-    if (savedSpeed) setSpeed(savedSpeed);
-    if (savedFont) setFontSize(savedFont);
+function Songs({songs,active,setActive,update,saveState,setSongs}:{songs:Song[];active:Song;setActive:(s:string)=>void;update:(p:Partial<Song>)=>void;saveState:string;setSongs:React.Dispatch<React.SetStateAction<Song[]>>}){const [query,setQuery]=useState("");if(!active)return <Empty title="Your catalog is empty"/>;const sections=(next:Section[])=>update({sections:next});const snapshot=()=>update({versions:[{date:new Date().toLocaleString(),sections:structuredClone(active.sections)},...active.versions].slice(0,10)});return <div className="workspace"><aside className="catalog"><label className="search">⌕<input aria-label="Search songs" placeholder="Search songs…" value={query} onChange={e=>setQuery(e.target.value)}/></label>{songs.filter(s=>!s.archived&&s.title.toLowerCase().includes(query.toLowerCase())).map(s=><button className={s.id===active.id?"selected":""} key={s.id} onClick={()=>setActive(s.id)}><b>{s.title}</b><small>{s.status} · {s.key}</small></button>)}</aside><section className="editor"><div className="editor-bar"><span className={saveState==="Saved"?"saved":"saving"}>● {saveState}</span><button onClick={()=>window.print()}>Print</button><button onClick={()=>{const blob=new Blob([JSON.stringify(active,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${active.title}.json`;a.click()}}>Export</button><button className="danger" onClick={()=>{if(confirm("Delete this song?"))setSongs(v=>v.filter(s=>s.id!==active.id))}}>Delete</button></div><input className="title-input" aria-label="Song title" value={active.title} onChange={e=>update({title:e.target.value})}/><div className="metadata">{[["Genre","genre"],["Mood","mood"],["Key","key"],["Status","status"]].map(([label,key])=><label key={key}>{label}<input value={String(active[key as keyof Song]??"")} onChange={e=>update({[key]:e.target.value})}/></label>)}<label>Tempo<input type="number" value={active.tempo} onChange={e=>update({tempo:+e.target.value})}/></label><label>Capo<input type="number" min="0" max="12" value={active.capo} onChange={e=>update({capo:+e.target.value})}/></label></div><div className="section-list">{active.sections.map((sec,i)=><article className="lyric-section" key={sec.id}><header><select aria-label="Section type" value={sec.type} onChange={e=>sections(active.sections.map(x=>x.id===sec.id?{...x,type:e.target.value}:x))}>{["Intro","Verse","Pre-chorus","Chorus","Bridge","Outro"].map(x=><option key={x}>{x}</option>)}</select><div><button disabled={!i} onClick={()=>{const a=[...active.sections];[a[i-1],a[i]]=[a[i],a[i-1]];sections(a)}}>↑</button><button onClick={()=>sections([...active.sections.slice(0,i+1),{...sec,id:uid()},...active.sections.slice(i+1)])}>Duplicate</button><button onClick={()=>sections(active.sections.filter(x=>x.id!==sec.id))}>×</button></div></header><textarea aria-label={`${sec.type} lyrics`} value={sec.text} onFocus={snapshot} onChange={e=>sections(active.sections.map(x=>x.id===sec.id?{...x,text:e.target.value}:x))}/></article>)}</div><button className="add-section" onClick={()=>sections([...active.sections,{id:uid(),type:"Verse",text:""}])}>＋ Add section</button><div className="details-grid"><label>Notes<textarea value={active.notes} onChange={e=>update({notes:e.target.value})}/></label><label>Tags<input value={active.tags} onChange={e=>update({tags:e.target.value})}/></label><label>Songwriter credits & ownership<input value={active.credits} onChange={e=>update({credits:e.target.value})}/></label><div><b>Version history</b>{active.versions.length?active.versions.map((v,i)=><button className="version" key={i} onClick={()=>update({sections:v.sections})}>Restore {v.date}</button>):<small>No saved versions yet</small>}</div></div></section></div>}
 
-    const online = () => setIsOnline(true);
-    const offline = () => setIsOnline(false);
-    window.addEventListener("online", online);
-    window.addEventListener("offline", offline);
+function WritingTools({song,update}:{song:Song;update:(p:Partial<Song>)=>void}){const [tool,setTool]=useState(tools[0]),[text,setText]=useState(song?.sections[0]?.text??""),[result,setResult]=useState<string[]>([]),[loading,setLoading]=useState(false),[applied,setApplied]=useState<{id:string;text:string}|null>(null);const run=()=>{setLoading(true);setResult([]);setTimeout(()=>{setLoading(false);setResult([])},400)};return <div className="two-col"><section className="panel tool-panel"><span className="eyebrow">FOCUSED WRITING ROOM</span><h2>Find the truer line.</h2><p>Select a lyric or paste a passage. Suggestions stay separate until you explicitly apply them.</p><label>Writing action<select value={tool} onChange={e=>setTool(e.target.value)}>{tools.map(t=><option key={t}>{t}</option>)}</select></label><label>Selected line or section<textarea value={text} onChange={e=>setText(e.target.value)}/></label><div className="metadata"><label>Genre<input defaultValue={song?.genre}/></label><label>Mood<input defaultValue={song?.mood}/></label><label>Follow original<select><option>Closely</option><option>Balanced</option><option>Loosely</option></select></label><label>Syllables (estimate)<input type="number" placeholder="Optional"/></label></div><button className="primary" onClick={run}>✦ Generate suggestions</button></section><section className="panel suggestions"><h3>Suggestions</h3>{loading?<div className="loader">Checking AI configuration…</div>:result.length?result.map(r=><article key={r}><p>{r}</p><button onClick={()=>{const sec=song.sections[0];setApplied({id:sec.id,text:sec.text});update({sections:song.sections.map(s=>s.id===sec.id?{...s,text:s.text.replace(text,r)}:s)})}}>Apply</button></article>):<div className="setup"><span>✦</span><h3>AI setup required</h3><p>Add a server-side AI provider key to generate live suggestions. This app never presents canned text as AI output.</p><code>OPENAI_API_KEY=…</code></div>}{applied&&<button onClick={()=>{update({sections:song.sections.map(s=>s.id===applied.id?{...s,text:applied.text}:s)});setApplied(null)}}>↶ Undo applied suggestion</button>}<small>Syllable counts are estimates and may vary with pronunciation.</small></section></div>}
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then(() => navigator.serviceWorker.ready)
-        .then(() => setOfflineReady(true))
-        .catch(() => setOfflineReady(false));
-    }
+function ChordCharts({song,go}:{song:Song;go:(v:View)=>void}){const [semi,setSemi]=useState(0),[live,setLive]=useState(false),[font,setFont]=useState(22),[playing,setPlaying]=useState(false);const chart=transposeChordPro(song.sections.map(s=>`{${s.type}}\n${s.text}`).join("\n\n"),semi,semi<0);useEffect(()=>{if(!playing)return;const id=setInterval(()=>scrollBy({top:2}),50);return()=>clearInterval(id)},[playing]);if(live)return <div className="live"><header><button onClick={()=>setLive(false)}>← Exit</button><b>{song.title}</b><button onClick={()=>go("Writing Tools")}>Tools</button></header><pre style={{fontSize:font}}>{chart}</pre><footer><button onClick={()=>setPlaying(!playing)}>{playing?"Ⅱ Pause":"▶ Auto-scroll"}</button><label>Size <input type="range" min="16" max="38" value={font} onChange={e=>setFont(+e.target.value)}/></label><span>Offline ready · Wake lock requested while scrolling</span></footer></div>;return <><div className="chart-head"><div><span className="eyebrow">PLAY IT YOUR WAY</span><h2>{song.title}</h2><p>Original shapes in {song.key} · Capo {song.capo} · transposed {semi} semitones</p></div><div><button onClick={()=>window.print()}>Print / PDF</button><button className="primary" onClick={()=>setLive(true)}>▶ Live mode</button></div></div><div className="two-col chart-layout"><section className="panel chord-sheet"><div className="transpose"><button onClick={()=>setSemi(semi-1)}>−</button><b>{semi===0?"Original":`${semi>0?"+":""}${semi} semitones`}</b><button onClick={()=>setSemi(semi+1)}>＋</button><button onClick={()=>setSemi(0)}>Reset</button></div><pre>{chart}</pre></section><section><ChordIdentifier song={song}/><div className="panel quick-tools"><h3>Performance tools</h3><button onClick={()=>document.getElementById("tuner")?.scrollIntoView()}>⌁ Open microphone tuner</button><p>ChordPro import/export supported by bracketed chord notation.</p></div></section></div><Tuner/></>}
 
-    return () => {
-      window.removeEventListener("online", online);
-      window.removeEventListener("offline", offline);
-    };
-  }, []);
+function ChordIdentifier({song}:{song:Song}){const [pos,setPos]=useState<(number|null)[]>([null,3,2,0,1,0]),[tuning,setTuning]=useState("Standard"),[capo,setCapo]=useState(song.capo),[custom,setCustom]=useState(TUNINGS.Standard);const tuned=tuning==="Custom"?custom:TUNINGS[tuning];const result=identifyChord(pos,tuned,capo);return <section className="panel identifier"><PanelHead title="Chord identifier" action="Live calculation"/><div className="id-result"><span>Most likely</span><strong>{result.primary}</strong><small>{result.notes.join(" · ")||"Select notes"}</small>{result.alternatives.length>0&&<em>Also possible: {result.alternatives.join(", ")}</em>}</div><div className="fretboard" role="group" aria-label="Interactive guitar fretboard">{pos.map((p,string)=><div className="string" key={string}><b>{["E","A","D","G","B","E"][string]}</b><button className={p===null?"on":""} onClick={()=>setPos(v=>v.map((x,i)=>i===string?null:x))}>×</button>{Array.from({length:13},(_,f)=><button aria-label={`String ${string+1} fret ${f}`} className={p===f?"on":""} onClick={()=>setPos(v=>v.map((x,i)=>i===string?f:x))} key={f}>{f}</button>)}</div>)}</div><div className="id-controls"><label>Tuning<select value={tuning} onChange={e=>setTuning(e.target.value)}>{[...Object.keys(TUNINGS),"Custom"].map(t=><option key={t}>{t}</option>)}</select></label><label>Capo<input type="number" min="0" max="12" value={capo} onChange={e=>setCapo(+e.target.value)}/></label><button onClick={()=>setPos([null,null,null,null,null,null])}>Clear</button><button onClick={()=>window.print()}>Print</button><button className="primary">Save to song</button></div>{tuning==="Custom"&&<div className="custom-tune">{custom.map((m,i)=><select key={i} value={m%12} onChange={e=>setCustom(v=>v.map((x,j)=>j===i?x-x%12+ +e.target.value:x))}>{NOTE_NAMES.map((n,j)=><option value={j} key={n}>{n}</option>)}</select>)}</div>}<p className="hint">Shape: {identifyChord(pos,tuned,0).primary} · Sounding with capo {capo}: {result.primary}. × means muted; 0 means open.</p></section>}
 
-  useEffect(() => localStorage.setItem("stage-scroll-speed", String(speed)), [speed]);
-  useEffect(() => localStorage.setItem("stage-font-size", String(fontSize)), [fontSize]);
+function Tuner(){const [state,setState]=useState("idle"),[reading,setReading]=useState<{note:string;octave:number;cents:number;freq:number}|null>(null),[ref,setRef]=useState(440),stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),raf=useRef(0);const stop=()=>{cancelAnimationFrame(raf.current);stream.current?.getTracks().forEach(t=>t.stop());ctx.current?.close();stream.current=null;ctx.current=null;setState("idle")};const start=async()=>{if(!navigator.mediaDevices?.getUserMedia){setState("unsupported");return}try{stream.current=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});ctx.current=new AudioContext();const source=ctx.current.createMediaStreamSource(stream.current),an=ctx.current.createAnalyser();an.fftSize=4096;source.connect(an);const buf=new Float32Array(an.fftSize);setState("listening");const tick=()=>{an.getFloatTimeDomainData(buf);const f=autoCorrelate(buf,ctx.current!.sampleRate);if(f>0){const n=frequencyToNote(f,ref);setReading({...n,freq:f});setState("listening")}else setState("weak");raf.current=requestAnimationFrame(tick)};tick()}catch{setState("denied")}};useEffect(()=>stop,[]);return <section id="tuner" className="panel tuner"><div><span className="eyebrow">LOCAL AUDIO · NEVER RECORDED</span><h2>Chromatic tuner</h2><p>Automatic nearest-note detection, including low E.</p></div><div className="tuner-display"><span>{reading?`${reading.note}${reading.octave}`:"—"}</span><b>{reading?`${reading.freq.toFixed(1)} Hz`:state==="weak"?"Weak or noisy signal":"Ready"}</b><div className="meter"><i style={{left:`${50+(reading?.cents??0)*.9}%`}}/><em>♭</em><strong>IN TUNE</strong><em>♯</em></div><small>{reading?`${Math.abs(reading.cents)} cents ${reading.cents<0?"flat":reading.cents>0?"sharp":"in tune"}`:state==="denied"?"Microphone denied. Allow access in browser settings.":state==="unsupported"?"Microphone capture is unsupported.":"Play one string clearly"}</small></div><div className="tuner-controls"><label>Reference A4 <input type="number" min="430" max="450" value={ref} onChange={e=>setRef(+e.target.value)}/> Hz</label><label>Target<select><option>Automatic</option><option>Low E · E2</option><option>A · A2</option><option>D · D3</option><option>G · G3</option><option>B · B3</option><option>High E · E4</option></select></label>{state==="idle"||state==="denied"||state==="unsupported"?<button className="primary" onClick={start}>Start tuner</button>:<button className="danger" onClick={stop}>Stop tuner</button>}</div><p className="hint">Microphone access requires HTTPS or localhost. Check address-bar permissions if access is blocked.</p></section>}
 
-  const currentIndex = songs.findIndex((song) => song.id === currentId);
-  const song = currentIndex >= 0 ? songs[currentIndex] : null;
+function Setlists({songs,lists,setLists}:{songs:Song[];lists:Setlist[];setLists:React.Dispatch<React.SetStateAction<Setlist[]>>}){const list=lists[0];if(!list)return <Empty title="Create your first setlist"/>;const patch=(p:Partial<Setlist>)=>setLists(v=>v.map(x=>x.id===list.id?{...x,...p}:x));const total=list.songs.reduce((n,s)=>n+s.duration,0)+list.breakMinutes*60;return <><div className="chart-head"><div><span className="eyebrow">SETLIST BUILDER</span><h2>{list.name}</h2><p>{list.venue} · {list.date}</p></div><div><button onClick={()=>window.print()}>Print / export</button><button className="primary">▶ Open live</button></div></div><section className="panel set-builder"><div className="set-summary"><b>{list.songs.length} songs</b><span>Estimated {Math.floor(total/60)} min {total%60} sec including {list.breakMinutes} min breaks</span></div>{list.songs.map((s,i)=><article key={s.id}><span className="drag">⠿</span><b>{i+1}</b><div><strong>{s.title}</strong><small>{s.cover?"Cover":"Original"}</small></div><label>Key<input value={s.key} onChange={e=>patch({songs:list.songs.map(x=>x.id===s.id?{...x,key:e.target.value}:x)})}/></label><label>Capo<input type="number" value={s.capo} onChange={e=>patch({songs:list.songs.map(x=>x.id===s.id?{...x,capo:+e.target.value}:x)})}/></label><label>Seconds<input type="number" value={s.duration} onChange={e=>patch({songs:list.songs.map(x=>x.id===s.id?{...x,duration:+e.target.value}:x)})}/></label><input aria-label="Performance notes" value={s.notes} onChange={e=>patch({songs:list.songs.map(x=>x.id===s.id?{...x,notes:e.target.value}:x)})}/><button disabled={!i} onClick={()=>{const a=[...list.songs];[a[i-1],a[i]]=[a[i],a[i-1]];patch({songs:a})}}>↑</button><button disabled={i===list.songs.length-1} onClick={()=>{const a=[...list.songs];[a[i],a[i+1]]=[a[i+1],a[i]];patch({songs:a})}}>↓</button></article>)}<div className="add-song"><select id="add-song"><option value="">Choose a song…</option>{songs.map(s=><option value={s.id} key={s.id}>{s.title}</option>)}</select><button onClick={()=>{const el=document.getElementById("add-song") as HTMLSelectElement;const s=songs.find(x=>x.id===el.value);if(s)patch({songs:[...list.songs,{id:uid(),songId:s.id,title:s.title,key:s.key,capo:s.capo,duration:210,notes:"",cover:false}]})}}>Add original</button><button onClick={()=>patch({songs:[...list.songs,{id:uid(),songId:"",title:"Cover song",key:"C",capo:0,duration:210,notes:"",cover:true}]})}>Add cover</button><label>Breaks <input type="number" value={list.breakMinutes} onChange={e=>patch({breakMinutes:+e.target.value})}/> min</label></div></section></>}
 
-  const stop = useCallback(() => {
-    setPlaying(false);
-    setControlsHidden(false);
-    previousTime.current = null;
-    if (frame.current) cancelAnimationFrame(frame.current);
-  }, []);
+function Service({kind,songs,orders,setOrders}:{kind:"TunePitch"|"Critique";songs:Song[];orders:Order[];setOrders:React.Dispatch<React.SetStateAction<Order[]>>}){const [step,setStep]=useState(1),[song,setSong]=useState(songs[0]?.id||""),[agree,setAgree]=useState(false);const selected=songs.find(s=>s.id===song),mine=orders.filter(o=>o.kind===kind);const submit=()=>{if(selected){setOrders(v=>[{id:`${kind==="TunePitch"?"TP":"CR"}-${Date.now().toString().slice(-6)}`,kind,song:selected.title,status:"Draft",created:new Date().toLocaleDateString(),update:"Package created; checkout is not configured."},...v]);setStep(4)}};return <><section className="service-hero"><span className="eyebrow">{kind==="TunePitch"?"TUNEPITCH BY TODD BAILEY":"SONG CRITIQUE BY TODD BAILEY"}</span><h2>{kind==="TunePitch"?"Prepare your song for the right ears.":"Thoughtful feedback from one songwriter to another."}</h2><p>{kind==="TunePitch"?"Build and review an exact submission package. No recipient counts, placements, responses, or airplay are guaranteed.":"Todd’s personal critique is written and published by the administrator—separate from automated writing assistance."}</p></section><div className="steps">{["Choose song","Package details","Review","Complete"].map((s,i)=><span className={step>=i+1?"on":""} key={s}><b>{i+1}</b>{s}</span>)}</div><div className="two-col"><section className="panel service-form">{step===1&&<><h3>Select from your workspace</h3><div className="song-picker">{songs.map(s=><label className={song===s.id?"selected":""} key={s.id}><input type="radio" name="song" checked={song===s.id} onChange={()=>setSong(s.id)}/><span>♪</span><div><b>{s.title}</b><small>{s.genre} · {s.key}</small></div></label>)}</div><button className="primary" onClick={()=>setStep(2)}>Continue</button></>}{step===2&&<><h3>{kind==="TunePitch"?"Submission package":"What should Todd focus on?"}</h3><label>Audio file<input type="file" accept="audio/mpeg,audio/wav,audio/mp4"/></label><label>Listening link<input type="url" placeholder="https://…"/></label><label>{kind==="TunePitch"?"Short song description":"Arrangement notes"}<textarea/></label>{kind==="Critique"&&<><label>Feedback requested<textarea placeholder="Lyrics, structure, hook, melody…"/></label><label className="check"><input type="checkbox"/> This demo was AI-generated (optional)</label></>}<p className="hint">Audio: MP3, WAV, or M4A up to 25 MB. Files remain private.</p><button onClick={()=>setStep(1)}>Back</button><button className="primary" onClick={()=>setStep(3)}>Review package</button></>}{step===3&&<><h3>Review before checkout</h3><dl><dt>Song</dt><dd>{selected?.title}</dd><dt>Lyrics</dt><dd>{selected?.sections.map(s=>s.text).join("\n").slice(0,160)}…</dd><dt>Credits</dt><dd>{selected?.credits||"Missing—return and add credits"}</dd><dt>Service</dt><dd>{kind} · pricing set by administrator</dd></dl><label className="check"><input type="checkbox" checked={agree} onChange={e=>setAgree(e.target.checked)}/> I confirm this package is accurate.</label><button onClick={()=>setStep(2)}>Back</button><button className="primary" disabled={!agree} onClick={submit}>Create draft order</button></>}{step===4&&<div className="success"><span>✓</span><h3>Draft created</h3><p>Checkout is in sandbox setup mode. No charge or delivery occurred.</p><button onClick={()=>setStep(1)}>Prepare another</button></div>}</section><section className="panel history"><h3>{kind} history</h3>{mine.length?mine.map(o=><article key={o.id}><header><b>{o.song}</b><span>{o.status}</span></header><small>{o.id} · {o.created}</small><p>{o.update}</p></article>):<Empty title="No orders yet"/>}</section></div></>}
 
-  useEffect(() => {
-    if (!playing) setControlsHidden(false);
-  }, [playing]);
-
-  useEffect(() => {
-    if (!playing) return;
-    const tick = (now: number) => {
-      if (previousTime.current !== null) {
-        const delta = Math.min((now - previousTime.current) / 1000, 0.1);
-        window.scrollBy(0, speed * delta);
-        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
-          stop();
-          return;
-        }
-      }
-      previousTime.current = now;
-      frame.current = requestAnimationFrame(tick);
-    };
-    frame.current = requestAnimationFrame(tick);
-    return () => {
-      if (frame.current) cancelAnimationFrame(frame.current);
-      previousTime.current = null;
-    };
-  }, [playing, speed, stop]);
-
-  useEffect(() => {
-    const resumeWakeLock = async () => {
-      if (!playing || wakeLock.current || !("wakeLock" in navigator)) return;
-      try {
-        wakeLock.current = await navigator.wakeLock.request("screen");
-        setWakeActive(true);
-        wakeLock.current.addEventListener?.("release", () => setWakeActive(false));
-      } catch {
-        setWakeActive(false);
-      }
-    };
-    resumeWakeLock();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") resumeWakeLock();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [playing]);
-
-  const selectSong = (id: string) => {
-    stop();
-    setCurrentId(id);
-    window.scrollTo({ top: 0 });
-  };
-
-  const goToSong = (offset: number) => {
-    if (!songs.length) return;
-    const next = (currentIndex + offset + songs.length) % songs.length;
-    selectSong(songs[next].id);
-  };
-
-  const lines = useMemo(() => {
-    if (!song) return [];
-    return song.content.split("\n").filter((line) => showChords || !chordLine.test(line.trim()));
-  }, [song, showChords]);
-
-  if (!song) {
-    return (
-      <main className="library">
-        <header className="library-hero">
-          <div className="brand-mark">SC</div>
-          <p className="eyebrow">YOUR STAGE SONGBOOK</p>
-          <h1>Stage Chords</h1>
-          <p className="intro">
-            Pick a song, clip in, and let the page move with you.
-          </p>
-        </header>
-        <section className="song-list" aria-label="Songs">
-          <div className="list-heading">
-            <span>SET LIST</span>
-            <span>{songs.length || "—"} SONGS</span>
-          </div>
-          {songs.map((item, index) => (
-            <button className="song-card" key={item.id} onClick={() => selectSong(item.id)}>
-              <span className="track-number">{String(index + 1).padStart(2, "0")}</span>
-              <span className="track-copy">
-                <strong>{item.title}</strong>
-                <small>{item.artist}</small>
-                <em>{item.meta}</em>
-              </span>
-              <span className="arrow" aria-hidden="true">→</span>
-            </button>
-          ))}
-        </section>
-        <footer className="library-footer">
-          <span className={`status-dot ${offlineReady ? "saved" : ""}`} />
-          {!isOnline ? "Working offline" : offlineReady ? "Saved for offline use" : "Saving for offline use…"}
-        </footer>
-      </main>
-    );
-  }
-
-  return (
-    <main className={`player ${controlsHidden ? "controls-hidden" : ""}`} style={{ "--song-font": `${fontSize}px` } as React.CSSProperties}>
-      <nav className="player-nav">
-        <button onClick={() => { stop(); setCurrentId(null); }} aria-label="Back to set list">←</button>
-        <div>
-          <span>{String(currentIndex + 1).padStart(2, "0")} / {String(songs.length).padStart(2, "0")}</span>
-          <strong>STAGE CHORDS</strong>
-        </div>
-        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top">↑</button>
-      </nav>
-
-      <article className="song-sheet">
-        <header className="song-header">
-          <p>{song.meta}</p>
-          <h1>{song.title}</h1>
-          <h2>{song.artist}</h2>
-        </header>
-        <div className="rule" />
-        <div className="lyrics" aria-label={`Chords and lyrics for ${song.title}`}>
-          {lines.map((line, index) => {
-            const trimmed = line.trim();
-            const isSection = /^\[.+\]$/.test(trimmed) || /^\*.+\*$/.test(trimmed);
-            const isMedley = trimmed.includes("MEDLEY CHANGE");
-            const isRule = /^━+$/.test(trimmed);
-            const isChord = trimmed.length > 0 && chordLine.test(trimmed);
-            if (isRule) return null;
-            return (
-              <div
-                key={`${index}-${line}`}
-                className={`${isSection ? "section-label" : ""} ${isMedley ? "medley-change" : ""} ${isChord ? "chord-line" : ""}`}
-              >
-                {line || "\u00a0"}
-              </div>
-            );
-          })}
-        </div>
-        <div className="end-mark">
-          <span>END</span>
-          <div />
-        </div>
-      </article>
-
-      {!controlsHidden ? <section className="control-dock" aria-label="Performance controls">
-        <div className="control-row">
-          <button className="side-button" onClick={() => goToSong(-1)} aria-label="Previous song">‹</button>
-          <button className={`main-button ${playing ? "is-playing" : ""}`} onClick={() => setPlaying((value) => !value)}>
-            <PlayIcon playing={playing} />
-            <span>{playing ? "PAUSE" : "AUTO-SCROLL"}</span>
-          </button>
-          <button className="side-button" onClick={() => goToSong(1)} aria-label="Next song">›</button>
-        </div>
-        <div className="sliders">
-          <label>
-            <span>SCROLL SPEED</span>
-            <output>{speed}</output>
-            <input type="range" min="6" max="80" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} />
-            <small><i>SLOW</i><i>FAST</i></small>
-          </label>
-          <label>
-            <span>TEXT SIZE</span>
-            <output>{fontSize}</output>
-            <input type="range" min="14" max="30" value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} />
-            <small><i>A</i><i className="large-a">A</i></small>
-          </label>
-        </div>
-        <div className="dock-footer">
-          <button onClick={() => setShowChords((value) => !value)}>
-            <span className={showChords ? "toggle on" : "toggle"}><i /></span>
-            Chords
-          </button>
-          {playing ? (
-            <button className="hide-controls" onClick={() => setControlsHidden(true)}>
-              <span aria-hidden="true">⌄</span> Hide controls
-            </button>
-          ) : null}
-          <span className={wakeActive ? "awake active" : "awake"}><i /> {wakeActive ? "Screen awake" : "Screen wakes when playing"}</span>
-        </div>
-      </section> : (
-        <button className="show-controls" onClick={() => setControlsHidden(false)}>
-          <span aria-hidden="true">⌃</span> Show controls
-        </button>
-      )}
-    </main>
-  );
-}
+function Admin({orders,setOrders}:{orders:Order[];setOrders:React.Dispatch<React.SetStateAction<Order[]>>}){return <><div className="chart-head"><div><span className="eyebrow">ADMINISTRATOR ONLY</span><h2>Service operations</h2><p>Manage configurable packages, queues, and customer-visible updates.</p></div></div><section className="panel admin"><h3>Order queue</h3>{orders.length?orders.map(o=><article key={o.id}><b>{o.id}</b><span>{o.kind} · {o.song}</span><select value={o.status} onChange={e=>setOrders(v=>v.map(x=>x.id===o.id?{...x,status:e.target.value,update:`Status updated to ${e.target.value}.`}:x))}>{["Draft","Awaiting payment","Received","In review","Queued","Sent","Completed"].map(s=><option key={s}>{s}</option>)}</select><input aria-label="Customer update" value={o.update} onChange={e=>setOrders(v=>v.map(x=>x.id===o.id?{...x,update:e.target.value}:x))}/></article>):<Empty title="Queue is clear"/>}</section><section className="panel config"><h3>Service configuration</h3><div className="metadata"><label>Free submission<select><option>Enabled</option><option>Disabled</option></select></label><label>Paid package (up to 5 songs)<input placeholder="Price not configured"/></label><label>Recipient category<input placeholder="e.g. Music libraries"/></label><label>Turnaround<input placeholder="Set an honest estimate"/></label><label>Critique price<input placeholder="Price not configured"/></label><label>Checkout provider<select><option>Sandbox—not connected</option><option>Stripe</option></select></label></div><p className="hint">“Sent” only follows verified delivery or an authorized manual update. Payment webhook IDs must be deduplicated server-side.</p></section></>}
+function Account({profile,setProfile,songs}:{profile:Profile;setProfile:React.Dispatch<React.SetStateAction<Profile>>;songs:Song[]}){const [tab,setTab]=useState<"edit"|"preview">("edit"),[saved,setSaved]=useState(false);const patch=(p:Partial<Profile>)=>{setProfile(v=>({...v,...p}));setSaved(false)};const photo=(file?:File)=>{if(!file)return;if(file.size>2*1024*1024){alert("Choose an image under 2 MB.");return}if(!["image/jpeg","image/png","image/webp"].includes(file.type)){alert("Use a JPG, PNG, or WebP image.");return}const reader=new FileReader();reader.onload=()=>patch({photo:String(reader.result)});reader.readAsDataURL(file)};const shared=songs.filter(s=>profile.sharedSongIds.includes(s.id));return <><div className="profile-heading"><div><span className="eyebrow">YOUR SONGWRITER IDENTITY</span><h2>Songwriter Profile</h2><p>Your account details stay private. You choose whether your bio, links, and selected songs appear in the community showcase.</p></div><div className="profile-tabs"><button className={tab==="edit"?"active":""} onClick={()=>setTab("edit")}>Edit profile</button><button className={tab==="preview"?"active":""} onClick={()=>setTab("preview")}>Public preview</button></div></div>{tab==="edit"?<div className="profile-layout"><section className="panel profile-card"><div className="avatar large">{profile.photo?<img src={profile.photo} alt="Profile preview"/>:<span>{profile.name.split(/\s+/).map(n=>n[0]).slice(0,2).join("")||"♪"}</span>}</div><label className="photo-button">Upload profile picture<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>photo(e.target.files?.[0])}/></label><small>JPG, PNG, or WebP · maximum 2 MB</small>{profile.photo&&<button onClick={()=>patch({photo:""})}>Remove photo</button>}<div className="privacy-note"><b>Demo privacy notice</b><p>This preview stores account and profile data only in this browser. Do not enter sensitive or confidential information.</p></div></section><section className="panel profile-form"><h3>Account information</h3><p className="hint">Name and email are required to create an account. Email is never displayed on your public profile.</p><div className="form-grid"><label>Full name *<input required autoComplete="name" value={profile.name} onChange={e=>patch({name:e.target.value})}/></label><label>Email address *<input required type="email" autoComplete="email" value={profile.email} onChange={e=>patch({email:e.target.value})}/></label><label>Location<input value={profile.location} onChange={e=>patch({location:e.target.value})} placeholder="Nashville, TN"/></label><label>Website<input type="url" value={profile.website} onChange={e=>patch({website:e.target.value})} placeholder="https://…"/></label><label className="full">Songwriter bio<textarea maxLength={500} value={profile.bio} onChange={e=>patch({bio:e.target.value})} placeholder="Tell listeners about your sound, influences, and songwriting journey…"/><small>{profile.bio.length}/500 characters</small></label></div><h3>Social and music links</h3><div className="form-grid social-fields"><label>Instagram<input value={profile.instagram} onChange={e=>patch({instagram:e.target.value})} placeholder="Profile URL"/></label><label>Facebook<input value={profile.facebook} onChange={e=>patch({facebook:e.target.value})} placeholder="Profile URL"/></label><label>YouTube<input value={profile.youtube} onChange={e=>patch({youtube:e.target.value})} placeholder="Channel URL"/></label><label>Spotify<input value={profile.spotify} onChange={e=>patch({spotify:e.target.value})} placeholder="Artist URL"/></label></div><h3>Share songs on Songwriter Tools</h3><p className="hint">Only songs you explicitly select appear on your public profile. Lyrics, recordings, notes, critiques, and submission history remain private.</p><div className="share-list">{songs.map(s=><label key={s.id}><input type="checkbox" checked={profile.sharedSongIds.includes(s.id)} onChange={e=>patch({sharedSongIds:e.target.checked?[...profile.sharedSongIds,s.id]:profile.sharedSongIds.filter(id=>id!==s.id)})}/><span><b>{s.title}</b><small>{s.genre||"Uncategorized"} · {s.status}</small></span></label>)}</div><label className="publish-switch"><input type="checkbox" checked={profile.publicProfile} onChange={e=>patch({publicProfile:e.target.checked})}/><span><b>Make my songwriter profile public</b><small>Your selected profile information and shared songs can be discovered inside the app.</small></span></label><button className="primary" disabled={!profile.name.trim()||!/^\S+@\S+\.\S+$/.test(profile.email)} onClick={()=>{setSaved(true);setTab("preview")}}>Save profile</button>{saved&&<span className="saved-message">✓ Profile saved</span>}</section></div>:<PublicProfile profile={profile} songs={shared}/>}<section className="panel account-security"><div><h3>Account access</h3><p>Name and email will become the production sign-in identity after authentication is connected.</p></div><div><h3>Offline downloads</h3><p>Clear locally cached public application files from this browser.</p><button onClick={()=>caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k))))}>Clear offline content</button></div></section></>}
+function PublicProfile({profile,songs}:{profile:Profile;songs:Song[]}){const links=[["Website",profile.website],["Instagram",profile.instagram],["Facebook",profile.facebook],["YouTube",profile.youtube],["Spotify",profile.spotify]].filter(([,v])=>v);return <section className="public-profile panel"><span className={profile.publicProfile?"visibility public":"visibility private"}>{profile.publicProfile?"● PUBLIC PROFILE":"○ PRIVATE PREVIEW"}</span><div className="public-intro"><div className="avatar large">{profile.photo?<img src={profile.photo} alt={`${profile.name} profile`}/>:<span>{profile.name.split(/\s+/).map(n=>n[0]).slice(0,2).join("")||"♪"}</span>}</div><div><span className="eyebrow">SONGWRITER</span><h2>{profile.name||"Your name"}</h2>{profile.location&&<small>⌖ {profile.location}</small>}<p>{profile.bio||"Your songwriter bio will appear here."}</p><div className="profile-links">{links.map(([label,url])=><a href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noreferrer" key={label}>{label} ↗</a>)}</div></div></div><div className="showcase"><header><h3>Shared songs</h3><span>{songs.length} {songs.length===1?"song":"songs"}</span></header>{songs.length?songs.map(s=><article key={s.id}><span className="album">♪</span><div><b>{s.title}</b><small>{s.genre||"Uncategorized"} · {s.mood||"Original song"}</small></div><span>{s.key}</span><button aria-label={`Play ${s.title}`} disabled>▶</button></article>):<div className="empty"><span>♫</span><b>No songs shared yet</b><small>Select songs while editing your profile.</small></div>}</div></section>}
+const Empty=({title}:{title:string})=><div className="empty"><span>♫</span><b>{title}</b><small>New activity will appear here.</small></div>;

@@ -1,5 +1,5 @@
-const CACHE_NAME = "stage-chords-offline-v3";
-const APP_SHELL = ["/", "/songs.json", "/manifest.webmanifest", "/og.png"];
+const CACHE_NAME = "songwriter-tools-shell-v1";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/og.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

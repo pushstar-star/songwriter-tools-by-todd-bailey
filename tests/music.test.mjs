@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import ts from "typescript";
+import { readFile } from "node:fs/promises";
+const source=await readFile(new URL("../app/music.ts",import.meta.url),"utf8");
+const js=ts.transpile(source,{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022});
+const lib=await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+test("transposes only bracketed chords including slash bass and accidentals",()=>{assert.equal(lib.transposeChordPro("[D/F#] road [Bbmaj7] home C word",2),"[E/G#] road [Cmaj7] home C word")});
+test("identifies common guitar shapes",()=>{const cases=[[[-1,3,2,0,1,0],"C"],[[3,2,0,0,0,3],"G"],[[-1,-1,0,2,3,2],"D"],[[-1,0,2,2,1,0],"Am"],[[0,2,2,0,0,0],"Em"],[[2,0,0,2,3,2],"D/F#"]];for(const [shape,name] of cases){const got=lib.identifyChord(shape.map(x=>x<0?null:x));assert.equal(got.primary,name)}});
+test("capo changes sounding chord and alternate tunings calculate notes",()=>{assert.equal(lib.identifyChord([null,3,2,0,1,0],lib.TUNINGS.Standard,2).primary,"D");assert.equal(lib.identifyChord([0,0,0,2,3,0],lib.TUNINGS.DADGAD).notes.length,6)});
+test("pitch math resolves E2 and A4",()=>{const e=lib.frequencyToNote(82.4069);assert.equal(e.note,"E");assert.equal(e.octave,2);assert.ok(Math.abs(e.target-82.4069)<.001);assert.equal(lib.frequencyToNote(440).note,"A");assert.equal(lib.frequencyToNote(440).octave,4)});
+test("autocorrelation detects generated E2 and A4 tones",()=>{for(const f of [82.4069,440]){const sr=48000,b=new Float32Array(8192);for(let i=0;i<b.length;i++)b[i]=.6*Math.sin(2*Math.PI*f*i/sr);assert.ok(Math.abs(lib.autoCorrelate(b,sr)-f)<1)}});

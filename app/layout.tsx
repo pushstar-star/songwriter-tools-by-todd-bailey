@@ -2,24 +2,24 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Stage Chords",
-  description: "A hands-free, auto-scrolling chord and lyric book for live performance.",
+  title: "Songwriter Tools by Todd Bailey",
+  description: "Write, organize, improve, pitch, and perform your songs.",
   manifest: "/manifest.webmanifest",
   openGraph: {
-    title: "Stage Chords",
-    description: "Your offline, auto-scrolling songbook for the stage.",
+    title: "Songwriter Tools by Todd Bailey",
+    description: "One workspace for every song, from first line to live stage.",
     images: ["/og.png"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Stage Chords",
-    description: "Your offline, auto-scrolling songbook for the stage.",
+    title: "Songwriter Tools by Todd Bailey",
+    description: "One workspace for every song, from first line to live stage.",
     images: ["/og.png"],
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Stage Chords",
+    title: "Songwriter Tools",
   },
 };
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head>
-        <meta name="theme-color" content="#090909" />
+        <meta name="theme-color" content="#171814" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body>{children}</body>
